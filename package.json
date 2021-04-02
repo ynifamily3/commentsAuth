@@ -4,12 +4,21 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon --watch src/ src/index.js"
+    "dev": "cross-env NODE_ENV=development nodemon --watch src/ src/index.js",
+    "start": "cross-env NODE_ENV=production node src/index.js"
   },
   "dependencies": {
+    "connect-ensure-login": "^0.1.1",
+    "cross-env": "^7.0.3",
     "dotenv": "^8.2.0",
+    "ejs": "^3.1.6",
     "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "morgan": "^1.10.0",
     "nodemon": "^2.0.7",
+    "passport": "^0.4.1",
     "passport-twitter": "^1.0.4"
-  }
+  },
+  "repository": "git@github.com:ynifamily3/commentsAuth.git",
+  "author": "Jongkeun Choi <jongkeun.ch@gmail.com>"
 }

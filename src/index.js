@@ -31,6 +31,11 @@ app.use(require("body-parser").urlencoded({ extended: true }));
 app.use(
   require("express-session")({
     secret: process.env["SESSION_SECRET"],
+    cookie: {
+      domain: process.env.NODE_ENV === "production" ? ".roco.moe" : "localhost",
+      path: "/",
+      maxAge: 1000 * 60 * 24,
+    },
     resave: true,
     saveUninitialized: false,
   })
@@ -55,7 +60,7 @@ app.get(
     );
   }
 );
-
+// https://chanyeong.com/blog/post/28 -> jwt token생성
 app.get("/auth/twitter/check", function (req, res) {
   if (!req.user) {
     res.json({ isLogin: false });

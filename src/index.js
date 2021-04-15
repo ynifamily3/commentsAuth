@@ -2,6 +2,10 @@ require("dotenv").config();
 var express = require("express");
 var passport = require("passport");
 var Strategy = require("passport-twitter").Strategy;
+const jwt = require("jsonwebtoken");
+const passportJWT = require("passport-jwt");
+const JWTStrategy = passportJWT.Strategy;
+
 passport.serializeUser(function (user, cb) {
   cb(null, user);
 });
@@ -25,6 +29,22 @@ passport.use(
   )
 );
 
+passport.use(
+  new JWTStrategy(
+    {
+      jwtFromRequest: (req) => req.cookies.jwt,
+      secretOrKey: process.env["SESSION_SECRET"],
+    },
+    (jwtPayload, done) => {
+      if (Date.now() > jwtPayload.expires) {
+        return done("jwt expired");
+      }
+
+      return done(null, jwtPayload);
+    }
+  )
+);
+
 var app = express();
 app.use(require("morgan")("combined"));
 app.use(require("body-parser").urlencoded({ extended: true }));
@@ -44,18 +64,26 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.get("/auth/twitter", passport.authenticate("twitter"));
+app.get("/auth/twitter", passport.authenticate("twitter", { session: false }));
 app.get(
   "/auth/twitter/callback",
   passport.authenticate("twitter"),
   function (req, res) {
     const { id, displayName, photos } = req.user;
-    console.log(req.user);
+    const payload = {
+      id,
+      expires: Date.now() + parseInt(3600),
+    };
+    const token = jwt.sign(
+      JSON.stringify(payload),
+      process.env["SESSION_SECRET"]
+    );
     res.send(
       renderTemplate("twitter", {
         id,
         displayName,
         photo: photos[0] ? photos[0].value : null,
+        token,
       })
     );
   }

@@ -20,7 +20,7 @@ passport.use(
       consumerSecret: process.env["TWITTER_CONSUMER_SECRET"],
       callbackURL:
         process.env.NODE_ENV === "production"
-          ? "https://roco.moe/callback_twitter.html"
+          ? "https://auth.roco.moe/auth/twitter/callback"
           : "http://localhost:8081/auth/twitter/callback",
     },
     function (token, tokenSecret, profile, cb) {

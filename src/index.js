@@ -78,46 +78,16 @@ app.get(
       JSON.stringify(payload),
       process.env["SESSION_SECRET"]
     );
-    res.cookie("Authorization", token, {
-      httpOnly: true,
-      domain: process.env.NODE_ENV === "production" ? ".roco.moe" : "localhost",
-      path: "/",
-      maxAge: 1000 * 3600,
-    });
     res.send(
       renderTemplate("twitter", {
         id,
         displayName,
         photo: photos[0] ? photos[0].value : null,
+        authorization: token,
       })
     );
   }
 );
-
-app.get("/auth/twitter/check", function (req, res) {
-  if (!req.headers.authorization) {
-    res.json({ isLogin: false });
-    return;
-  } else {
-    // { id: '1059668320331255809', expires: 1618471038410 }
-    // 유효기간 검증은 안한 듯
-    try {
-      const result = jwt.verify(
-        req.headers.authorization,
-        process.env["SESSION_SECRET"]
-      );
-      res.json({ isLogin: true, id: result["id"] });
-    } catch (e) {
-      console.log(e);
-      res.json({ isLogin: false });
-    }
-    // if (jwt.verify(req.headers.authorization, process.env["SESSION_SECRET"])) {
-    //   res.json({ isLogin: true });
-    // } else {
-    //   res.json({ isLogin: false });
-    // }
-  }
-});
 
 function renderTemplate(authMethod, authValue) {
   const services = new Map();

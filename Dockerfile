@@ -1,4 +1,4 @@
-FROM node:14.15.5
+FROM node:14.16.1
 LABEL MAINTAINER="jongkeun.ch@gmail.com"
 WORKDIR /usr/src/app
 COPY package*.json ./

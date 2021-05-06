@@ -72,7 +72,7 @@ app.get(
     const { id, displayName, photos } = req.user;
     const payload = {
       id,
-      expires: Date.now() + parseInt(3600),
+      expires: Date.now() + parseInt(3600) * 1000,
     };
     const token = jwt.sign(
       JSON.stringify(payload),

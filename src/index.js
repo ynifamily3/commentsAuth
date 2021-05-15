@@ -1,10 +1,9 @@
 require("dotenv").config();
 var express = require("express");
 var passport = require("passport");
-var Strategy = require("passport-twitter").Strategy;
+var TwitterStrategy = require("passport-twitter").Strategy;
+var KakaoStrategy = require("passport-kakao").Strategy;
 const jwt = require("jsonwebtoken");
-const passportJWT = require("passport-jwt");
-const JWTStrategy = passportJWT.Strategy;
 
 passport.serializeUser(function (user, cb) {
   cb(null, user);
@@ -13,15 +12,13 @@ passport.serializeUser(function (user, cb) {
 passport.deserializeUser(function (obj, cb) {
   cb(null, obj);
 });
+
 passport.use(
-  new Strategy(
+  new TwitterStrategy(
     {
       consumerKey: process.env["TWITTER_CONSUMER_KEY"],
       consumerSecret: process.env["TWITTER_CONSUMER_SECRET"],
-      callbackURL:
-        process.env.NODE_ENV === "production"
-          ? "https://auth.roco.moe/auth/twitter/callback"
-          : "http://localhost:8081/auth/twitter/callback",
+      callbackURL: "/auth/twitter/callback",
     },
     function (token, tokenSecret, profile, cb) {
       return cb(null, profile);
@@ -30,17 +27,14 @@ passport.use(
 );
 
 passport.use(
-  new JWTStrategy(
+  new KakaoStrategy(
     {
-      jwtFromRequest: (req) => req.cookies.jwt,
-      secretOrKey: process.env["SESSION_SECRET"],
+      clientID: process.env["KAKAO_CLIENT_ID"],
+      clientSecret: process.env["KAKAO_CLIENT_SECRET"],
+      callbackURL: "/auth/kakao/callback",
     },
-    (jwtPayload, done) => {
-      if (Date.now() > jwtPayload.expires) {
-        return done("jwt expired");
-      }
-
-      return done(null, jwtPayload);
+    function (accessToken, refreshToken, profile, cb) {
+      return cb(null, profile);
     }
   )
 );
@@ -54,7 +48,7 @@ app.use(
     cookie: {
       domain: process.env.NODE_ENV === "production" ? ".roco.moe" : "localhost",
       path: "/",
-      maxAge: 1000 * 60 * 24,
+      maxAge: 1000 * 10,
     },
     resave: true,
     saveUninitialized: false,
@@ -62,16 +56,17 @@ app.use(
 );
 
 app.use(passport.initialize());
-app.use(passport.session());
 
 app.get("/auth/twitter", passport.authenticate("twitter", { session: false }));
 app.get(
   "/auth/twitter/callback",
-  passport.authenticate("twitter"),
+  passport.authenticate("twitter", { session: false }),
   function (req, res) {
     const { id, displayName, photos } = req.user;
     const payload = {
       id,
+      displayName,
+      photo: photos[0] ? photos[0].value : null,
       expires: Date.now() + parseInt(3600) * 1000,
     };
     const token = jwt.sign(
@@ -80,9 +75,42 @@ app.get(
     );
     res.send(
       renderTemplate("twitter", {
-        id,
-        displayName,
-        photo: photos[0] ? photos[0].value : null,
+        ...payload,
+        authorization: token,
+      })
+    );
+  }
+);
+
+// 카카오
+app.get("/auth/kakao", passport.authenticate("kakao", { session: false }));
+app.get(
+  "/auth/kakao/callback",
+  passport.authenticate("kakao", { session: false }),
+  function (req, res) {
+    const {
+      id,
+      displayName,
+      _json: {
+        kakao_account: { profile },
+      },
+    } = req.user;
+    console.log("rr", req.user._json);
+    const photo = profile.is_default_image ? "" : profile.thumbnail_image_url;
+    const payload = {
+      id,
+      displayName,
+      photo,
+      expires: Date.now() + parseInt(3600) * 1000,
+    };
+    const token = jwt.sign(
+      JSON.stringify(payload),
+      process.env["SESSION_SECRET"]
+    );
+    console.log(payload);
+    res.send(
+      renderTemplate("kakao", {
+        ...payload,
         authorization: token,
       })
     );
@@ -92,6 +120,7 @@ app.get(
 function renderTemplate(authMethod, authValue) {
   const services = new Map();
   services.set("twitter", "트위터");
+  services.set("kakao", "카카오");
   const targetOrigin =
     process.env.NODE_ENV === "production"
       ? "https://roco.moe"

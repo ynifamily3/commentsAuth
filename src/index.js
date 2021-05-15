@@ -18,7 +18,10 @@ passport.use(
     {
       consumerKey: process.env["TWITTER_CONSUMER_KEY"],
       consumerSecret: process.env["TWITTER_CONSUMER_SECRET"],
-      callbackURL: "/auth/twitter/callback",
+      callbackURL:
+        process.env.NODE_ENV === "production"
+          ? "https://auth.roco.moe/auth/twitter/callback"
+          : "http://localhost:8081/auth/twitter/callback",
     },
     function (token, tokenSecret, profile, cb) {
       return cb(null, profile);
@@ -31,7 +34,10 @@ passport.use(
     {
       clientID: process.env["KAKAO_CLIENT_ID"],
       clientSecret: process.env["KAKAO_CLIENT_SECRET"],
-      callbackURL: "/auth/kakao/callback",
+      callbackURL:
+        process.env.NODE_ENV === "production"
+          ? "https://auth.roco.moe/auth/kakao/callback"
+          : "http://localhost:8081/auth/kakao/callback",
     },
     function (accessToken, refreshToken, profile, cb) {
       return cb(null, profile);

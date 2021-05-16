@@ -95,6 +95,7 @@ async function uploadToS3(fileName) {
         Key: `profile/${fileName}`,
         ACL: "public-read",
         Body: fs.createReadStream(fileName),
+        ContentType: mime.lookup(fileName),
       },
       (err, data) => {
         if (err) {

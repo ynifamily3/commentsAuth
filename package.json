@@ -8,6 +8,7 @@
     "start": "cross-env NODE_ENV=production node src/index.js"
   },
   "dependencies": {
+    "aws-sdk": "^2.907.0",
     "connect-ensure-login": "^0.1.1",
     "cross-env": "^7.0.3",
     "dotenv": "^8.2.0",
@@ -19,7 +20,8 @@
     "nodemon": "^2.0.7",
     "passport": "^0.4.1",
     "passport-kakao": "^1.0.1",
-    "passport-twitter": "^1.0.4"
+    "passport-twitter": "^1.0.4",
+    "request": "^2.88.2"
   },
   "repository": "git@github.com:ynifamily3/commentsAuth.git",
   "author": "Jongkeun Choi <jongkeun.ch@gmail.com>"

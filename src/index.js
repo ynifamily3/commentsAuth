@@ -4,6 +4,15 @@ var passport = require("passport");
 var TwitterStrategy = require("passport-twitter").Strategy;
 var KakaoStrategy = require("passport-kakao").Strategy;
 const jwt = require("jsonwebtoken");
+const AWS = require("aws-sdk");
+const fs = require("fs");
+const request = require("request");
+
+const s3 = new AWS.S3({
+  accessKeyId: process.env["S3_ACCESS_KEY_ID"],
+  secretAccessKey: process.env["S3_SECRET_ACCESS_KEY"],
+  region: process.env["S3_REGION"],
+});
 
 passport.serializeUser(function (user, cb) {
   cb(null, user);
@@ -63,65 +72,117 @@ app.use(
 
 app.use(passport.initialize());
 
-app.get("/auth/twitter", passport.authenticate("twitter", { session: false }));
-app.get(
-  "/auth/twitter/callback",
-  passport.authenticate("twitter", { session: false }),
-  function (req, res) {
-    const { id, displayName, photos } = req.user;
-    const payload = {
-      id,
-      displayName,
-      photo: photos[0] ? photos[0].value : null,
-      expires: Date.now() + parseInt(3600) * 1000,
-    };
-    const token = jwt.sign(
-      JSON.stringify(payload),
-      process.env["SESSION_SECRET"]
-    );
-    res.send(
-      renderTemplate("twitter", {
-        ...payload,
-        authorization: token,
-      })
-    );
-  }
-);
+async function downloadPhoto(url, fileName) {
+  return await new Promise((resolve, reject) => {
+    const stream = request(url).pipe(fs.createWriteStream(fileName));
+    stream.on("close", () => {
+      stream.close();
+      resolve();
+    });
+    stream.on("error", () => {
+      console.error("파일 다운로드 에러!");
+      stream.close();
+      reject();
+    });
+  });
+}
 
-// 카카오
-app.get("/auth/kakao", passport.authenticate("kakao", { session: false }));
-app.get(
-  "/auth/kakao/callback",
-  passport.authenticate("kakao", { session: false }),
-  function (req, res) {
-    const {
-      id,
-      displayName,
-      _json: {
-        kakao_account: { profile },
+async function uploadToS3(fileName) {
+  return await new Promise((resolve) => {
+    s3.upload(
+      {
+        Bucket: "moe-roco-comments-api",
+        Key: `profile/${fileName}`,
+        ACL: "public-read",
+        Body: fs.createReadStream(fileName),
       },
-    } = req.user;
-    console.log("rr", req.user._json);
-    const photo = profile.is_default_image ? "" : profile.thumbnail_image_url;
-    const payload = {
-      id,
-      displayName,
-      photo,
-      expires: Date.now() + parseInt(3600) * 1000,
-    };
-    const token = jwt.sign(
-      JSON.stringify(payload),
-      process.env["SESSION_SECRET"]
+      (err, data) => {
+        if (err) {
+          console.error("업로드 실패했어요.", err);
+          resolve(null);
+        } else {
+          resolve(`${process.env["OBJECT_URL"]}/profile/${fileName}`);
+        }
+      }
     );
-    console.log(payload);
-    res.send(
-      renderTemplate("kakao", {
-        ...payload,
-        authorization: token,
-      })
-    );
-  }
-);
+  });
+}
+
+async function deletePhotoLocal(fileName) {
+  return await new Promise((resolve, reject) => {
+    try {
+      fs.rmSync(fileName);
+      resolve();
+    } catch (e) {
+      console.error("임시파일 삭제 실패:", e);
+      reject();
+    }
+  });
+}
+
+function socialLoginController(authMethod) {
+  const getPhotoURL = (user) => {
+    switch (authMethod) {
+      case "twitter":
+        if (user.photos) return user.photos[0].value;
+        else return null;
+      case "kakao":
+        const profile = user._json.kakao_account.profile;
+        return profile.is_default_image ? null : profile.thumbnail_image_url;
+    }
+  };
+
+  app.get(
+    `/auth/${authMethod}`,
+    passport.authenticate(authMethod, { session: false })
+  );
+
+  app.get(
+    `/auth/${authMethod}/callback`,
+    passport.authenticate(authMethod, { session: false }),
+    function (req, res) {
+      const { id, displayName } = req.user;
+      const photoURL = getPhotoURL(req.user);
+      let photo = null;
+      (async () => {
+        if (photoURL) {
+          const fileName = `${authMethod}-${id}.${
+            photoURL.split(".").reverse()[0]
+          }`;
+          try {
+            await downloadPhoto(photos[0].value, fileName);
+            const s3URL = await uploadToS3(fileName);
+            await deletePhotoLocal(fileName);
+            photo = s3URL;
+          } catch (error) {
+            console.log("프로필 사진 복사 중 오류 발생:", error);
+          }
+        }
+        const payload = {
+          id,
+          displayName,
+          photo,
+          expires: Date.now() + parseInt(3600) * 1000,
+        };
+
+        const token = jwt.sign(
+          JSON.stringify(payload),
+          process.env["SESSION_SECRET"]
+        );
+
+        res.send(
+          renderTemplate(authMethod, {
+            ...payload,
+            authorization: token,
+          })
+        );
+      })();
+    }
+  );
+}
+
+socialLoginController("twitter");
+socialLoginController("kakao");
 
 function renderTemplate(authMethod, authValue) {
   const services = new Map();
@@ -140,6 +201,7 @@ function renderTemplate(authMethod, authValue) {
     </head>
     <body>
       <h1>로그인 중이에요...</h1>
+      <a href="/auth/${authMethod}">오랫동안 이화면이 보인다면... (재시도)</a>
       <script type="text/javascript">
         const user = ${JSON.stringify(authValue).replace(/</g, "\\u003c")};
         console.log(user);

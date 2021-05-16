@@ -23,37 +23,54 @@ passport.deserializeUser(function (obj, cb) {
   cb(null, obj);
 });
 
-passport.use(
-  new TwitterStrategy(
-    {
-      consumerKey: process.env["TWITTER_CONSUMER_KEY"],
-      consumerSecret: process.env["TWITTER_CONSUMER_SECRET"],
-      callbackURL:
-        process.env.NODE_ENV === "production"
-          ? "https://auth.roco.moe/auth/twitter/callback"
-          : "http://localhost:8081/auth/twitter/callback",
-    },
-    function (token, tokenSecret, profile, cb) {
-      return cb(null, profile);
-    }
-  )
-);
+function applyPassportStrategy(authMethod) {
+  const strategyOption = {};
+  let SocialStrategy = null;
+  switch (authMethod) {
+    case "twitter":
+      SocialStrategy = TwitterStrategy;
+      break;
+    case "kakao":
+      SocialStrategy = KakaoStrategy;
+      break;
+    default:
+      console.error("authMethod를 제대로 주십시오.");
+      break;
+  }
+  const callbackURL = `${
+    process.env.NODE_ENV === "production"
+      ? "https://auth.roco.moe"
+      : "http://localhost:8081"
+  }/auth/${authMethod}/callback`;
 
-passport.use(
-  new KakaoStrategy(
-    {
-      clientID: process.env["KAKAO_CLIENT_ID"],
-      clientSecret: process.env["KAKAO_CLIENT_SECRET"],
-      callbackURL:
-        process.env.NODE_ENV === "production"
-          ? "https://auth.roco.moe/auth/kakao/callback"
-          : "http://localhost:8081/auth/kakao/callback",
-    },
-    function (accessToken, refreshToken, profile, cb) {
+  switch (authMethod) {
+    case "twitter":
+      Object.assign(strategyOption, {
+        consumerKey: process.env["TWITTER_CONSUMER_KEY"],
+        consumerSecret: process.env["TWITTER_CONSUMER_SECRET"],
+        callbackURL,
+      });
+      break;
+    case "kakao":
+      Object.assign(strategyOption, {
+        clientID: process.env["KAKAO_CLIENT_ID"],
+        clientSecret: process.env["KAKAO_CLIENT_SECRET"],
+        callbackURL,
+      });
+      break;
+    default:
+      console.error("authMethod를 제대로 주십시오.");
+      break;
+  }
+  passport.use(
+    new SocialStrategy(strategyOption, function (_, __, profile, cb) {
       return cb(null, profile);
-    }
-  )
-);
+    })
+  );
+}
+
+applyPassportStrategy("twitter");
+applyPassportStrategy("kakao");
 
 var app = express();
 app.use(require("morgan")("combined"));
@@ -123,7 +140,6 @@ async function deletePhotoLocal(fileName) {
 
 function socialLoginController(authMethod) {
   const getPhotoURL = (user) => {
-    console.log("test:", user);
     switch (authMethod) {
       case "twitter":
         if (user.photos) return user.photos[0].value;
@@ -157,7 +173,7 @@ function socialLoginController(authMethod) {
             await deletePhotoLocal(fileName);
             photo = s3URL;
           } catch (error) {
-            console.log("프로필 사진 복사 중 오류 발생:", error);
+            console.error("프로필 사진 복사 중 오류 발생:", error);
           }
         }
         const payload = {
@@ -203,7 +219,7 @@ function renderTemplate(authMethod, authValue) {
     </head>
     <body>
       <h1>로그인 중이에요...</h1>
-      <a href="/auth/${authMethod}">오랫동안 이화면이 보인다면... (재시도)</a>
+      <a href="/auth/${authMethod}">오랫동안 이 화면이 보인다면... (재시도)</a>
       <script type="text/javascript">
         const user = ${JSON.stringify(authValue).replace(/</g, "\\u003c")};
         console.log(user);

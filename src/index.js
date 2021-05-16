@@ -122,6 +122,7 @@ async function deletePhotoLocal(fileName) {
 
 function socialLoginController(authMethod) {
   const getPhotoURL = (user) => {
+    console.log("test:", user);
     switch (authMethod) {
       case "twitter":
         if (user.photos) return user.photos[0].value;
@@ -150,7 +151,7 @@ function socialLoginController(authMethod) {
             photoURL.split(".").reverse()[0]
           }`;
           try {
-            await downloadPhoto(photos[0].value, fileName);
+            await downloadPhoto(photoURL, fileName);
             const s3URL = await uploadToS3(fileName);
             await deletePhotoLocal(fileName);
             photo = s3URL;

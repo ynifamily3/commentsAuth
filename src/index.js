@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const AWS = require("aws-sdk");
 const fs = require("fs");
 const request = require("request");
+const mime = require("mime-types");
 
 const s3 = new AWS.S3({
   accessKeyId: process.env["S3_ACCESS_KEY_ID"],
@@ -93,7 +94,6 @@ async function uploadToS3(fileName) {
       {
         Bucket: "moe-roco-comments-api",
         Key: `profile/${fileName}`,
-        ACL: "public-read",
         Body: fs.createReadStream(fileName),
         ContentType: mime.lookup(fileName),
       },

@@ -1,6 +1,7 @@
 const request = require("request");
 const mime = require("mime-types");
 const AWS = require("aws-sdk");
+const fs = require("fs");
 
 const s3 = new AWS.S3({
   accessKeyId: process.env["S3_ACCESS_KEY_ID"],
